@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/protect-workspace-publish.sh",
+        "matcher": "\\b(git|gh)\\b",
+        "failClosed": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+---
+description: workspace-git-publisher sub-agent 专用的 Git 发布安全约束
+alwaysApply: false
+---
+
+# Workspace Git 发布安全约束
+
+本规则不是全局规则，只供 `.cursor/agents/workspace-git-publisher.md` 这个发布 sub-agent 采用。
+
+本仓库只提交 CC / Cursor 协作配置资产，不提交业务源码或个人发布配置。
+
+提交、推送或创建 GitHub 仓库时必须遵守：
+
+- `agent-libs/` 与 `kindling/` 是用户自行拷贝进来的源码目录，禁止提交到本仓库。
+- `config/git-publish.env`、`.env*`、token、私钥和凭据文件禁止提交。
+- 真实 GitHub 账号、仓库地址、可见性等个人配置只写入本地忽略文件或由用户临时提供。
+- 可提交的只有模板、规则、skill、sub-agent、hook、README 等协作配置资产；说明文档和规则内容默认优先使用中文。
+- 提交前必须查看 `git status` 和 diff；推送前必须确认 remote 指向用户指定的 GitHub 仓库。
+- 禁止主动执行 `git push --force`、修改全局 git config 或提交 hook 发现的敏感内容。
+
+## `protect-workspace-publish` 与终端命令
+
+在 Cursor 里通过 shell 跑 `git` / `gh` 时，脚本会先对命令做**归一化**，再检查归一化后的字符串是否包含禁止片段（业务目录前缀、本地凭据相关字面量等，与脚本内对 `$command_scan` 的匹配一致）。
+
+对 **`git … commit`**（支持常见全局选项与 `/usr/bin/git` 形式），归一化会从参数列表里移除 `-m` / `--message` 及其取值（含多次 `-m`、`-mfoo`、`--message=…`），因此**提交说明里出现被禁止的字面量一般不再误拦**。仍会被拦的情况包括：`git add …` 等其它子命令的命令行里直接写出禁止路径、`git commit -F` 所给**文件路径**落在禁止模式上，或与 `&&` 拼接的其它命令里仍含禁止片段。
+
+无论命令行是否通过上述检查，**暂存区路径扫描**与 **commit/push 时的暂存 diff 密钥扫描**仍会执行；真正把业务目录或凭据文件 `git add` 进索引的提交依旧会被拒绝。

@@ -1,0 +1,27 @@
+---
+description: kindling-agent-workspace 规则放置约定（始终生效）
+alwaysApply: true
+---
+
+# 规则放置约定
+
+本 workspace 是 CC / Cursor 的协作配置资产仓库，不放业务源码。
+所有规则集中存放在 workspace 根 `.cursor/rules/`，按"作用对象"用子目录分类：
+
+- `.cursor/rules/*.mdc` — 跨所有子项目生效的通用规则。
+- `.cursor/rules/agent-rules/*.mdc` — 只供对应 Cursor sub-agent 采用：目录名与 `.cursor/agents/`（agent 定义）区分，避免混淆；通常 `alwaysApply: false`，由 `.cursor/agents/*.md` 通过 `@` 显式引用；与按源码树注入的 `globs` 规则区分开，一般不为这类文件配 `globs: agent-libs/**` 等。
+- `.cursor/rules/agent-libs/*.mdc` — 只对 `agent-libs/` 子项目生效，必须配 `globs: agent-libs/**` 或更细的子路径。
+- `.cursor/rules/kindling/*.mdc` — 只对 `kindling/` 子项目生效，必须配 `globs: kindling/**` 或更细的子路径。
+
+## 新增规则时
+
+- 子项目专属规则 → 放进对应子目录，**用 `globs` 约束路径**，不要 `alwaysApply: true`，否则会污染其它子项目。
+- sub-agent 专用规则 → 放进 `.cursor/rules/agent-rules/`，`alwaysApply: false`，并在对应 `.cursor/agents/` 定义里 `@` 引用。
+- 通用规则 → 放在 `.cursor/rules/` 根级，可用 `alwaysApply: true`。
+- 不要在 `agent-libs/` 或 `kindling/` 子项目内再建 `.cursor/rules/`——规则一律放 workspace 根。
+
+## 文档与规则语言
+
+- 新增或修改 README、rule、skill、sub-agent、hook 提示文案时，默认优先使用中文。
+- 命令、配置键、环境变量、工具名、文件名和必须由工具识别的字段保持原样，不为了中文化破坏功能。
+- 面向用户或 Agent 的说明尽量写成清晰中文，只有引用英文 API、命令输出或上游术语时保留英文。

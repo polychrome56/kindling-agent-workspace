@@ -1,0 +1,12 @@
+---
+description: Kernel / TC-BPF 约定（agent-libs/driver）
+globs: agent-libs/driver/**
+alwaysApply: false
+---
+# Kernel 与 TC-BPF 约定
+
+- kernel 侧和 BPF 代码遵循 Linux kernel style，不要套用 userspace 约定文件。
+- 保持 BPF 程序对 verifier 友好：
+  - 避免不必要的指针复杂度
+  - 保持有界逻辑
+  - 优先使用简单控制流和小型 helper

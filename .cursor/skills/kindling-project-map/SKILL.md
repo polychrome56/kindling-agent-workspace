@@ -15,6 +15,12 @@ disable-model-invocation: false
 - `kindling/probe/src/core/`：核心功能实现区，按模块承载具体能力实现。
 - `kindling/probe/src/core/traffic_forwarding/`：流量转发相关实现，重点关注模块职责、资源生命周期和模块间协作。
 
+## traffic_forwarding 模块边界
+
+- `virtual_device`：设备生命周期、基础 link 状态、设备统计入口。
+- `tc qdisc / rate limit`：建议后续拆出 `TcQdiscManager`。
+- `src/example`：当前承担需要 root、`iproute2`、`tc` 的集成验证。
+
 ## 使用方式
 
 当用户要求编写、修改、重构、解释或审查这个项目中的代码时，先做下面几步：

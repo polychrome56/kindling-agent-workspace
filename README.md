@@ -1,170 +1,138 @@
 # kindling-agent-workspace
 
-为 **Claude Code（CC）** 与 **Cursor** 等主流 Coding Agent 提供 *可继承、可复用* 的
-**prompt / rule / sub-agent 资产仓库**。
+这是一个给 **Cursor / Claude Code（CC）** 使用的 Agent 协作配置资产仓库，用来沉淀可复用的 rule、skill、sub-agent、command 和 hook。
 
-本工作区不是一个传统业务代码仓库，而是一个"Agent 协作配置"的集中存放点。
-
----
+本仓库不是业务源码仓库。`agent-libs/`、`kindling/` 这类目录可以作为本地工作区源码存在，但它们属于用户自行放入的业务代码，默认被 `.gitignore` 排除，不应提交到本仓库。
 
 ## 它解决什么问题
 
 1. **继承之前好的 prompt**
-   把在过往项目里调试出来、被验证有效的 system prompt、协作原则、风格约束沉淀下来，
-   下一个新项目直接挂上即可，不用从零开始反复试。
+   把在过往项目里调试出来、被验证有效的 system prompt、协作原则、风格约束沉淀下来，下一个新项目直接挂上即可，不用从零开始反复试。
 
 2. **节省 token**
-   通用约束统一放进 `alwaysApply: true` 的 rule（Cursor）/ `CLAUDE.md`（CC），
-   避免每次对话再把背景、约定、风格手动贴一遍。
+   通用约束统一放进 `alwaysApply: true` 的 rule、专用 skill、sub-agent 或 command，避免每次对话再把背景、约定、风格手动贴一遍。
 
 3. **更安全**
-   通过 rule 与 hook 显式限制模型的工具调用范围、危险操作（批量 `rm`、
-   `git push --force`、改 `~/.ssh` 等），把"该不该做"的判断从 prompt 里前置到配置里。
+   通过 rule 与 hook 显式限制模型的工具调用范围、危险操作（批量 `rm`、`git push --force`、改 `~/.ssh` 等），把"该不该做"的判断从 prompt 里前置到配置里。
 
-4. **CC / Cursor 双栈复用**
-   两种工具的配置可以并存于同一目录，便于团队在两者之间切换或同时使用，
-   也方便把一份规则同时分发到两种 Agent 工具。
-
----
+4. **Cursor / CC 双栈复用**
+   两种工具的配置可以并存于同一目录，便于团队在两者之间切换或同时使用，也方便把一份协作约定迁移到不同 Agent 工具。
 
 ## 设计原则：仓库只保留规则与新特性，不带业务代码
 
 > 工作区下可以存在 `agent-libs/`、`kindling/` 这类子项目源码目录，但它们属于
 > **用户自行拷贝进来的业务代码**，不属于本 git 仓库的内容。
 
-只保留 CC / Cursor 用得到的"协作配置类"内容，典型包括：
+只保留 Cursor / CC 用得到的"协作配置类"内容，典型包括：
 
-- **Cursor 侧**
-  - `.cursor/rules/*.mdc` — 项目级规则（支持 `globs` / `alwaysApply`）
-  - `.cursor/agents/` — Cursor 项目级 sub-agents
-  - `.cursor/commands/`、`.cursor/hooks/`、`.cursor/skills/` 等新特性目录
-- **Claude Code 侧**
-  - `CLAUDE.md` / `AGENTS.md` — 项目级常驻指令
-  - `.claude/agents/` — Claude Code 兼容的 sub-agents 定义（需要时再添加）
-  - `.claude/commands/`、`.claude/hooks/` 等新特性目录
+- **Cursor 侧**：`.cursor/rules/`、`.cursor/agents/`、`.cursor/commands/`、`.cursor/hooks/`、`.cursor/skills/` 等。
+- **Claude Code 侧**：`CLAUDE.md`、`AGENTS.md`、`.claude/agents/`、`.claude/commands/`、`.claude/hooks/` 等需要时再添加。
 
 这样做的好处：
 
-- **下载体积小**：分发只带规则文件，不带源码与构建产物；
-- **不与业务仓库强耦合**：每个子目录的规则可以被对应业务仓库以 submodule / 拷贝 / 软链方式引入；
+- **下载体积小**：分发只带规则文件，不带源码与构建产物。
+- **不与业务仓库强耦合**：每个子目录的规则可以被对应业务仓库以 submodule、拷贝或软链方式引入。
 - **聚焦 Agent 协作经验本身**：规则更新与业务代码演进解耦，不会被某次具体实现绑死。
 
----
-
-## 目录结构
+## 当前目录
 
 ```text
 kindling-agent-workspace/
-├─ .gitignore                                  # 忽略源码目录与本地个人配置
-├─ README.md                                  # 本文件
-├─ .cursor/
-│  ├─ agents/
-│  │  └─ workspace-git-publisher.md           # Cursor 发布 sub-agent
-│  ├─ hooks.json                              # Cursor hook 配置
-│  ├─ hooks/
-│  │  └─ protect-workspace-publish.sh         # 发布前安全检查
-│  ├─ skills/
-│  │  └─ publish-workspace/
-│  │     └─ SKILL.md                          # 发布 sub-agent 专用 skill
-│  └─ rules/
-│     ├─ workspace-overview.mdc               # workspace 级 alwaysApply：放置约定
-│     ├─ agent-rules/
-│     │  └─ workspace-git-publish.mdc         # 发布 sub-agent 专用规则（非全局）
-│     ├─ agent-libs/
-│     │  └─ bpf-kernel-tc-conventions.mdc     # globs: agent-libs/driver/**
-│     └─ kindling/
-│        └─ collaboration-principles.mdc      # globs: kindling/**
+├─ README.md
+├─ .gitignore
 ├─ config/
 │  └─ git-publish.env.example                 # 本地发布配置模板
-├─ agent-libs/                                # 用户自行拷贝进来的源码目录（git 不带）
-└─ kindling/                                  # 用户自行拷贝进来的源码目录（git 不带）
+├─ .cursor/
+│  ├─ agents/
+│  │  └─ workspace-git-publisher.md           # 发布本 workspace 的专用 sub-agent
+│  ├─ commands/
+│  │  └─ publish-workspace.md                 # 调用发布 sub-agent 的命令入口
+│  ├─ hooks.json                              # Cursor hook 配置
+│  ├─ hooks/
+│  │  └─ protect-workspace-publish.sh         # git / gh 操作前的安全检查
+│  ├─ skills/
+│  │  ├─ git-commit-message/
+│  │  │  └─ SKILL.md                          # Conventional Commits + 中文提交说明
+│  │  ├─ kindling-project-map/
+│  │  │  └─ SKILL.md                          # kindling / agent-libs 项目结构地图
+│  │  ├─ modern-cpp/
+│  │  │  └─ SKILL.md                          # C/C++ 工程实践辅助
+│  │  └─ publish-workspace/
+│  │     └─ SKILL.md                          # workspace-git-publisher 专用发布流程
+│  └─ rules/
+│     ├─ workspace-overview.mdc               # workspace 级 alwaysApply 放置约定
+│     ├─ agent-rules/
+│     │  └─ workspace-git-publish.mdc         # 发布 sub-agent 专用规则
+│     ├─ agent-libs/
+│     │  └─ bpf-kernel-tc-conventions.mdc     # agent-libs 专属规则
+│     └─ kindling/
+│        ├─ collaboration-principles.mdc      # kindling 协作规则
+│        └─ cpp-engineering.mdc               # kindling C/C++ 工程规则
+├─ agent-libs/                                # 本地源码目录，git 不跟踪
+└─ kindling/                                  # 本地源码目录，git 不跟踪
 ```
 
-所有规则集中放在 workspace 根 `.cursor/rules/`，按"作用对象"用子目录分类。
-子项目目录里**不再放** `.cursor/rules/`。
+`config/git-publish.env` 是本地发布配置文件，已被 `.gitignore` 忽略；只提交 `config/git-publish.env.example`。
 
----
+## 资产分层
 
-## 规则分层（按作用对象分子目录）
+| 路径 | 用途 |
+| --- | --- |
+| `.cursor/rules/*.mdc` | 跨整个 workspace 生效的通用规则，可使用 `alwaysApply: true`。 |
+| `.cursor/rules/agent-rules/*.mdc` | 只供特定 sub-agent 显式引用，不作为全局规则。 |
+| `.cursor/rules/agent-libs/*.mdc` | 只面向 `agent-libs/`，必须用 `globs` 限定范围。 |
+| `.cursor/rules/kindling/*.mdc` | 只面向 `kindling/`，必须用 `globs` 限定范围。 |
+| `.cursor/skills/*/SKILL.md` | 可复用的任务技能；专用 skill 应在说明中标明触发边界。 |
+| `.cursor/agents/*.md` | Cursor 项目级 sub-agent 定义。 |
+| `.cursor/commands/*.md` | 面向用户的 Cursor command 入口。 |
+| `.cursor/hooks/*` | 操作前后的安全检查或自动化脚本。 |
 
-| 路径                                       | 作用范围                                          |
-| ------------------------------------------ | ------------------------------------------------- |
-| `.cursor/rules/*.mdc`                      | 跨所有子项目通用，可 `alwaysApply: true`          |
-| `.cursor/rules/agent-rules/*.mdc`         | 只供对应 sub-agent，通常 `alwaysApply: false`，由 `.cursor/agents/` 定义 `@` 引用（与 agent 定义目录区分） |
-| `.cursor/rules/agent-libs/*.mdc`           | 只对 `agent-libs/`，必须配 `globs: agent-libs/**` |
-| `.cursor/rules/kindling/*.mdc`             | 只对 `kindling/`，必须配 `globs: kindling/**`     |
-
-**约束**：子项目专属规则禁止开 `alwaysApply: true`，必须靠 `globs` 限定路径，
-否则会污染其它子项目。
-
-> 取舍说明：所有规则集中在 workspace 根的代价是——若**单独打开** `agent-libs/` 或
-> `kindling/` 这两个 git 仓库作为工作区，本仓库的规则不会被加载。如需在那种场景也生效，
-> 请改用 git submodule 或软链方式把对应规则带入对应仓库。
-
----
+子项目专属规则不要设置 `alwaysApply: true`，必须靠 `globs` 约束到对应目录。不要在 `agent-libs/` 或 `kindling/` 子项目里再建 `.cursor/rules/`；规则统一放在 workspace 根的 `.cursor/rules/`。
 
 ## 如何使用
 
-1. **先准备源码目录**：如需让规则作用于 `agent-libs/` 或 `kindling/`，请先把对应业务仓库源码
-   自行拷贝到这两个目录；它们不是本仓库自带内容。
-2. **作为 workspace 打开**：在 Cursor / CC 里直接以本目录为根打开，
-   `.cursor/rules/` 下的所有规则会按各自的 `globs` / `alwaysApply` 被自动加载。
-3. **新增规则的位置选择**：
-   - 通用约束 → `.cursor/rules/` 根级，`alwaysApply: true`
-   - sub-agent 专用 → `.cursor/rules/agent-rules/`，`alwaysApply: false`，并在对应 `.cursor/agents/*.md` 里 `@` 引用
-   - 子项目专属 → `.cursor/rules/<sub>/`，**必须**配 `globs: <sub>/**`，不要开 `alwaysApply: true`
-4. **新增 sub-agent**：Cursor 项目级 sub-agent 放到 `.cursor/agents/`，
-   按用途命名（如 `workspace-git-publisher.md`）。如需兼容 Claude Code，再额外放到 `.claude/agents/`。
-
----
+1. 如需让规则作用于 `agent-libs/` 或 `kindling/`，先把对应业务仓库源码放到 workspace 根下同名目录。
+2. 在 Cursor / CC 中以 `kindling-agent-workspace` 为根打开，Cursor 会按 `.cursor/rules/` 中的 `alwaysApply` 和 `globs` 加载规则。
+3. 修改 README、rule、skill、sub-agent、hook 提示文案时，默认优先使用中文；命令、配置键、环境变量和工具字段保持原样。
+4. 新增通用规则放 `.cursor/rules/` 根级；新增子项目规则放对应子目录并配置 `globs`；新增 sub-agent 专用规则放 `.cursor/rules/agent-rules/` 并由 sub-agent 显式 `@` 引用。
+5. 如需兼容 Claude Code，可按需要新增 `CLAUDE.md`、`AGENTS.md` 或 `.claude/` 资产；当前仓库主要资产集中在 Cursor 目录。
 
 ## 发布到 GitHub
 
-本仓库提供专门的 Cursor 发布 sub-agent，用来把 **kindling-agent-workspace 本身**提交到 GitHub：
+发布本 workspace 时，优先使用 `.cursor/commands/publish-workspace.md` 或直接调用 `.cursor/agents/workspace-git-publisher.md` 中的 `workspace-git-publisher` sub-agent。
 
-- 入口：使用 `.cursor/agents/workspace-git-publisher.md` 中的 `workspace-git-publisher` sub-agent。
-- 专用 skill：`.cursor/skills/publish-workspace/SKILL.md`，只供 `workspace-git-publisher` 采用，不作为全局自动触发 skill。
-- 专用 rule：`.cursor/rules/agent-rules/workspace-git-publish.mdc`，只供 `workspace-git-publisher` 采用，不作为全局 alwaysApply 规则。
-- 安全保护：`.cursor/hooks/protect-workspace-publish.sh` 会在 agent 执行 git / gh 命令前拦截源码目录、个人配置和疑似密钥。
+发布链路包括：
 
-首次发布前，先准备本地配置：
+- `.cursor/agents/workspace-git-publisher.md`：负责检查 git 状态、确认提交身份、remote 和 GitHub 仓库信息。
+- `.cursor/skills/publish-workspace/SKILL.md`：发布 sub-agent 专用流程，不作为全局自动触发 skill。
+- `.cursor/rules/agent-rules/workspace-git-publish.mdc`：发布 sub-agent 专用安全约束。
+- `.cursor/hooks/protect-workspace-publish.sh`：在 `git` / `gh` 命令前拦截源码目录、个人配置和疑似密钥。
+
+首次发布前可复制本地配置：
 
 ```bash
 cp config/git-publish.env.example config/git-publish.env
 ```
 
-然后在 `config/git-publish.env` 里填写：
+常用变量：
 
 ```bash
 GITHUB_OWNER=your-github-user-or-org
 GITHUB_REPO=kindling-agent-workspace
 GITHUB_VISIBILITY=private
 GIT_REMOTE_NAME=origin
+GIT_AUTHOR_NAME=your-git-author-name
+GIT_AUTHOR_EMAIL=your-git-author-email
+GH_TOKEN=your-temporary-token
 ```
 
-`config/git-publish.env` 已被 `.gitignore` 忽略，里面可以放个人 GitHub owner、仓库名和可见性；不要在里面放 token。GitHub 认证请使用 `gh auth login` 或本机已有的 git 凭据管理。
+`config/git-publish.env` 只能作为本机配置使用，不要提交。`GH_TOKEN` 如需临时使用，也只能放在这个被忽略的本地文件中；不要输出 token 原文或写入被版本控制追踪的文件。
 
-发布助手会优先使用 GitHub CLI：
-
-```bash
-gh repo create "$GITHUB_OWNER/$GITHUB_REPO" --"$GITHUB_VISIBILITY" --source=. --remote="${GIT_REMOTE_NAME:-origin}" --push
-```
-
-如果没有 `gh`，就先在 GitHub 网页创建空仓库，再添加远程并推送：
-
-```bash
-git branch -M main
-git remote add "${GIT_REMOTE_NAME:-origin}" "https://github.com/$GITHUB_OWNER/$GITHUB_REPO.git"
-git push -u "${GIT_REMOTE_NAME:-origin}" main
-```
-
-无论哪种方式，都不要提交 `agent-libs/`、`kindling/`、`config/git-publish.env`、`.env*`、token 或私钥。
-
----
+无论使用 `gh` 还是手动配置 remote，都不要提交 `agent-libs/`、`kindling/`、`config/git-publish.env`、`.env*`、token、私钥或其它凭据。
 
 ## 不做的事
 
-- 不在本仓库放业务代码、构建产物、二进制。
-- 不在子项目目录里再建 `.cursor/rules/`——规则一律放 workspace 根。
-- 不把不同 Agent 工具的私有约定混进同一个文件，CC 与 Cursor 各走各自的目录约定。
-- 不提交个人 GitHub 账号配置、访问 token、私钥或本地发布配置。
+- 不在本仓库提交业务代码、构建产物、二进制或 IDE 缓存。
+- 不把本地个人配置、GitHub token、私钥或临时凭据提交进来。
+- 不让子项目专属规则全局生效。
+- 不把 Cursor / CC 的私有约定混进同一个文件；需要双栈复用时，按各自目录约定分别维护。

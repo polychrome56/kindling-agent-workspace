@@ -144,12 +144,45 @@ print(" ".join(normalized), end="")
 PY
 )"
 
-case "$command_scan" in
-  *"agent-libs/"*|*"kindling/"*|*"config/git-publish.env"*|*".env"*|*"id_rsa"*|*"id_ed25519"*)
-    deny "已拦截引用源码目录或本地凭据的 git/GitHub 命令。" \
-      "workspace 发布 hook 已拦截包含禁止路径的命令。"
-    ;;
-esac
+if COMMAND_SCAN="$command_scan" python3 - <<'PY'; then
+import os
+import shlex
+import sys
+
+cmd = os.environ.get("COMMAND_SCAN", "")
+try:
+    tokens = shlex.split(cmd, posix=True)
+except ValueError:
+    tokens = cmd.split()
+
+
+def normalize_path(token):
+    token = token.strip()
+    while token.startswith("./"):
+        token = token[2:]
+    return token
+
+
+def is_forbidden_path(token):
+    path = normalize_path(token)
+    return (
+        path == "agent-libs" or path.startswith("agent-libs/")
+        or path == "kindling" or path.startswith("kindling/")
+        or path == "config/git-publish.env"
+        or path == ".env" or path.startswith(".env.")
+        or path.endswith(".pem") or path.endswith(".key")
+        or path.endswith(".p12") or path.endswith(".pfx")
+        or path.endswith("id_rsa") or path.endswith("id_ed25519")
+    )
+
+
+sys.exit(1 if any(is_forbidden_path(token) for token in tokens) else 0)
+PY
+  :
+else
+  deny "已拦截引用源码目录或本地凭据的 git/GitHub 命令。" \
+    "workspace 发布 hook 已拦截包含禁止路径的命令。"
+fi
 
 workspace_name="$(basename "$PWD")"
 [ "$workspace_name" = "kindling-agent-workspace" ] || allow

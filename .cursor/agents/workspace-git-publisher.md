@@ -1,7 +1,7 @@
 ---
 name: workspace-git-publisher
 description: 发布或更新 kindling-agent-workspace 的 GitHub 仓库时使用。负责检查 git 状态、创建提交、创建或配置 GitHub 远程仓库，并避免提交业务源码和本地个人配置。
-model: composer-2
+model: composer-2-fast
 ---
 
 # Workspace Git 发布助手

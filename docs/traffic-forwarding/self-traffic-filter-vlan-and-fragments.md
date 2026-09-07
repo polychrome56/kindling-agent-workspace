@@ -15,7 +15,12 @@
 
 ## 1. 背景与目标
 
-流量转发在目标网卡 TC 上 `bpf_clone_redirect` 做旁路镜像。自有 VXLAN 从 underlay 发出后，若与业务口同 OVS bridge，可能**回灌**到业务口 ingress，旧逻辑只在 egress 按 UDP dport 防环时，会再次 clone，被 `veth_a` TBF 塑成「≈限速」的周期平台。
+流量转发在目标网卡 TC 上 `bpf_clone_redirect` 做旁路镜像。自有 VXLAN 从 underlay 发出后，可能再次进入采集路径，例如：
+
+- 与业务口 **同 OVS bridge** 回灌到业务口 ingress；  
+- **采集口直接包含 underlay 本口**（镜像挂在发 VXLAN 的那张网上）。
+
+旧逻辑若只靠 UDP dport、且漏掉 **IP 分片后续片**，会再次 clone，甚至「分片 → 再封装 → 再分片」反馈环，被 `veth_a` TBF 塑成「≈限速」的周期平台。详见 §5.2。
 
 目标：
 
@@ -143,14 +148,50 @@ IPv4 + protocol=UDP + 能读到 UDP 头 + dport ∈ self_udp_dports
 
 GSO 理想时每段都是完整「IP+UDP+VXLAN」，通常不必再 IP 分片；一旦落到 IP 分片，只有首片能用现有逻辑。
 
-### 5.2 错误做法（禁止）
+### 5.2 风险场景：采集口包含自有 underlay
+
+当 **被挂载做镜像的网卡** 同时是（或会再次看到）**自有 VXLAN 的 underlay 出口** 时，外层分片会重新进入采集路径。典型包括：
+
+| 拓扑 | 为何危险 |
+|------|----------|
+| 采集口 = underlay（如挂 `wlp0s20f3` / `mgm`，VXLAN 也从该口发出） | underlay **egress** 上的自有外层包，同一口 **ingress/egress TC** 都能再看见 |
+| 业务口与 underlay **同 OVS bridge** | underlay 发出的 VXLAN **回灌**进业务口 ingress（见 hairpin 文档） |
+
+外层 IP 分片发生在封装之后、发往 underlay 的 IP 出站路径上；在 underlay egress 上已能看到分片。若这些片再次命中采集 TC：
+
+```text
+业务/镜像 → … → VXLAN 封装 → underlay 发出
+                    ↓ 外层可能 IP 分片
+         首片：有 UDP dport → dport skip 可拦住（修好后）
+         后续片：无 UDP 头 → 仅靠 dport **拦不住**
+                    ↓ 再 clone
+         把「上一层的分片」当新内层再封一层 VXLAN
+                    ↓
+         新外层又可能再分片 → 新后续片又可能被采 …
+```
+
+这是**反馈环**（出去的片又当业务采进来），不是单包在栈里同步无限递归：
+
+- 有 `veth_a` TBF 时，常表现为「采集量被限速卡住的平台期」，而不是瞬时算力爆炸。  
+- 环的燃料主要是 **`off>0` 的后续片**；整包/首片在 dport skip 生效后已可打断一截。  
+- `self_frags` 正是堵住「后续片再封装」这一环：首片命中自有端口且 MF=1 时记 key，后续片连坐 skip。
+
+**抓包注意：** `udp port 4790` **写不出**后续片（无 UDP 头）；要看完整链需按 VTEP/`host` 抓，或 `(udp port 4790) or (ip[6:2] & 0x1fff != 0)`。tcpdump 里后续片常显示为 `ip-proto-17`。
+
+缓解优先级：
+
+1. 尽量 **不要**把 underlay 本口配进业务采集集合（采集与 underlay 分离）。  
+2. 同桥场景保留 ingress+egress dport skip。  
+3. 上 `self_frags`，并尽量少产生外层分片（GSO/MTU）。
+
+### 5.3 错误做法（禁止）
 
 | 做法 | 后果 |
 |------|------|
 | 凡是 IPv4 分片（或所有非首片）一律 skip | **误伤**业务大包分片，镜像缺片，`collected_bytes` 偏少 |
 | 凡是 `protocol=UDP` 的非首片一律 skip | 同样误伤业务 UDP 分片 |
 
-### 5.3 推荐做法：只连坐「自有 VXLAN 分片链」
+### 5.4 推荐做法：只连坐「自有 VXLAN 分片链」
 
 ```text
 1. 首片：UDP dport ∈ self_udp_dports → skip；
@@ -165,7 +206,7 @@ GSO 理想时每段都是完整「IP+UDP+VXLAN」，通常不必再 IP 分片；
 | 业务 UDP/TCP 分片 | **仍采集**（不进表） |
 | 业务完整包 | 不变 |
 
-### 5.4 Map 参数（已落地）
+### 5.5 Map 参数（已落地）
 
 map：`traffic_forwarding_self_frags`
 
@@ -190,13 +231,13 @@ struct traffic_forwarding_self_frag_key {
 | max_entries | 8192 | 短生命周期；远小于 flow 表 |
 | 写入条件 | 仅 **offset==0** 且 dport 命中且 **MF=1** | 整包（MF=0）不必占表 |
 | 填充方 | **BPF 自动**；用户态不填 | 与 `self_udp_dports` 职责分离 |
-| 声明位置 | **TF maps 段末尾**（`flow_source` 之后） | 用户态不 set；避免插在中间打乱合并分支上 fd / `types` enum 序号 |
+| 声明位置 | **全量 `maps.h` 最末尾**（`stash` 及后续 map 之后）；TF 专用头则在文件末 | 用户态不 set、不进 `sysdig_map_types`；只追加 ELF maps 段，不挤原有 fd 序号 |
 | 刷新 | 命中后续片时更新时间戳 | 延长仍在传输的链 |
 
 伪代码骨架：
 
 ```text
-frag_off = ntohs(iph->frag_off)
+frag_off = bpf_ntohs(iph->frag_off)
 offset   = frag_off & IP_OFFSET
 mf       = frag_off & IP_MF
 
@@ -214,7 +255,7 @@ if mf:
 return skip
 ```
 
-### 5.5 残留与边界
+### 5.6 残留与边界
 
 | 情况 | 行为 |
 |------|------|
@@ -223,14 +264,14 @@ return skip
 | IP ID 复用 + TTL 内 | 极短窗口误 skip 同四元组其它 UDP 分片；2s TTL 压低概率 |
 | QinQ / 外层 IPv6 | 本设计仍不覆盖 |
 
-### 5.6 与「接收端能不能收到」
+### 5.7 与「接收端能不能收到」
 
 - skip 的是业务口上「不要再采自有隧道」；**不挡** underlay 正常出站。  
 - 精确 key 方案下，业务分片仍进采集管道。
 
-### 5.7 治本（并行，优先降低对 map 的依赖）
+### 5.8 治本（并行，优先降低对 map 的依赖）
 
-隧道 GSO / 控制段长，使外层 ≤ underlay MTU，少产生外层 IP 分片。分片变少后，多数情况只需 §4 的 dport 过滤。
+隧道 GSO / 控制段长，使外层 ≤ underlay MTU，少产生外层 IP 分片。分片变少后，多数情况只需 §4 的 dport 过滤。尽量避免「采集集合 ⊇ underlay 本口」。
 
 ---
 
@@ -274,11 +315,13 @@ return skip
 - 制造外层 IP 分片的自有 VXLAN：首片 + 后续片均不被再次 clone（依赖首片先到并写入 map）。  
 - 业务大 UDP 分片：后续片仍会被 clone。  
 
-现场确认回灌仍用 hairpin 文档最小抓包集（underlay out 有、业务口 in 有、业务口 out 无）。
+现场确认回灌仍用 hairpin 文档最小抓包集（underlay out 有、业务口 in 有、业务口 out 无）。  
+采集口含 underlay 时：underlay out 上应能看到外层分片续片（`ip-proto-17`）；有 `self_frags` 后这些续片不应再推高 `veth_a` 采集。
 
 ---
 
 ## 9. 一句话
 
 > **VLAN：剥一层 tag 再认 VXLAN 端口，几乎不误伤业务（已落地）。**  
-> **分片：不能一刀切 skip；首片认 dport 并（MF=1 时）写入 LRU 表，后续片按 `(saddr,daddr,proto,id)` 连坐；优先少分片（已落地）。**
+> **分片：不能一刀切 skip；首片认 dport 并（MF=1 时）写入 LRU 表，后续片按 `(saddr,daddr,proto,id)` 连坐。**  
+> **采集口若包含自有 underlay（或同桥回灌），后续片漏过滤会再封装再分片形成反馈环；`self_frags` 用于掐断该环（已落地）。**

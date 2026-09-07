@@ -190,7 +190,8 @@ struct traffic_forwarding_self_frag_key {
 | max_entries | 8192 | 短生命周期；远小于 flow 表 |
 | 写入条件 | 仅 **offset==0** 且 dport 命中且 **MF=1** | 整包（MF=0）不必占表 |
 | 填充方 | **BPF 自动**；用户态不填 | 与 `self_udp_dports` 职责分离 |
-| 刷新 | 命中后续片时可更新时间戳（可选，实现时二选一写清） | 延长仍在传输的链 |
+| 声明位置 | **TF maps 段末尾**（`flow_source` 之后） | 用户态不 set；避免插在中间打乱合并分支上 fd / `types` enum 序号 |
+| 刷新 | 命中后续片时更新时间戳 | 延长仍在传输的链 |
 
 伪代码骨架：
 

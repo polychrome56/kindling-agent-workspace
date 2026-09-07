@@ -7,10 +7,9 @@
 > | 能力 | 状态 |
 > |------|------|
 > | 单层 802.1Q/AD 后再认 IPv4+UDP dport | **已落地**（`tf_parse_eth_l3` + `traffic_forwarding_should_skip_by_udp_dport`） |
-> | 自有 VXLAN 分片链 LRU map（非首片连坐 skip） | **设计已定，待实现** |
+> | 自有 VXLAN 分片链 LRU map（非首片连坐 skip） | **已落地**（`traffic_forwarding_self_frags`，软 TTL 2s） |
 >
-> 当前运行时已能跳过：无 VLAN 或单层 VLAN 后的完整 IPv4+UDP（含分片**首片**），且 dport ∈ 自有 VXLAN 端口表。  
-> **非首片**仍可能漏过滤，需靠下文分片 map 收口。
+> 当前运行时可跳过：无 VLAN 或单层 VLAN 后的完整 IPv4+UDP（含分片首片，dport ∈ 表），以及已记入 `self_frags` 且未过期的**后续片**。
 
 ---
 
@@ -43,15 +42,14 @@ flowchart TD
   dportHit -->|no| keep
   dportHit -->|yes| skip1[skip 不clone]
   skip1 --> mf{MF==1?}
-  mf -->|yes| put[写入 self_frags<br/>待实现]
+  mf -->|yes| put[写入 self_frags]
   mf -->|no| endNode[结束]
-  frag -->|"offset!=0<br/>后续片"| look[lookup self_frags<br/>待实现]
+  frag -->|"offset!=0<br/>后续片"| look[lookup self_frags]
   look -->|命中且未过期| skip2[skip]
   look -->|miss或过期| keep
 ```
 
-实现入口（现状函数名）：`traffic_forwarding_should_skip_by_udp_dport()`  
-（落地分片 map 时可扩成 `…_should_skip_self_traffic()`，或保持原名向内扩展。）
+实现入口：`traffic_forwarding_should_skip_by_udp_dport()`（内含分片链逻辑）。
 
 ---
 
@@ -128,7 +126,7 @@ IPv4 + protocol=UDP + 能读到 UDP 头 + dport ∈ self_udp_dports
 
 ---
 
-## 5. 后续片：分片状态 map（设计已定，待实现）
+## 5. 后续片：分片状态 map（已落地）
 
 ### 5.1 为何会分片
 
@@ -167,9 +165,9 @@ GSO 理想时每段都是完整「IP+UDP+VXLAN」，通常不必再 IP 分片；
 | 业务 UDP/TCP 分片 | **仍采集**（不进表） |
 | 业务完整包 | 不变 |
 
-### 5.4 Map 定稿参数
+### 5.4 Map 参数（已落地）
 
-建议新增：`traffic_forwarding_self_frags`
+map：`traffic_forwarding_self_frags`
 
 ```c
 struct traffic_forwarding_self_frag_key {
@@ -242,7 +240,7 @@ return skip
 | 以太 → IPv4 → UDP → dport∈表 | QinQ |
 | 以太 → **单层 802.1Q/AD** → IPv4 → UDP → dport∈表 | 外层 IPv6 |
 | 完整包 / 分片首片（dport） | — |
-| 分片后续片：经 `self_frags` 连坐（**待实现**） | 乱序首包前的偶发漏 skip |
+| 分片后续片：经 `self_frags` 连坐 | 乱序首包前的偶发漏 skip |
 
 ---
 
@@ -252,15 +250,15 @@ return skip
 1. VLAN 单层解析                         → 已做
 2. ingress + egress 共用 dport skip      → 已做（见 hairpin 文档）
 3. 减少外层 IP 分片（GSO/MTU）           → 治本，持续
-4. 实现 self_frags LRU + 软 TTL          → 下一步编码
+4. 实现 self_frags LRU + 软 TTL          → 已做
 5. 禁止「全局 skip 所有分片」            → 评审红线
 ```
 
-编码落点（实现时）：
+编码落点：
 
-- map / key：`traffic_forwarding_maps.h`、`types.h`  
-- 逻辑：`traffic_forwarding_helpers.h`（扩展现有 skip）  
-- 调用：`probe.c` ingress / egress（保持同一入口）  
+- map / key：`traffic_forwarding_maps.h`、`types.h`（`traffic_forwarding_self_frags`）  
+- 逻辑：`traffic_forwarding_helpers.h`（`traffic_forwarding_should_skip_by_udp_dport`）  
+- 调用：`probe.c` ingress / egress  
 - 约定：局部变量使用处声明或带初始值（见 bpf-kernel-tc-conventions）
 
 ---
@@ -271,13 +269,9 @@ return skip
 
 - 带一层 802.1Q 的自有 VXLAN：ingress/egress 均不再二次 clone。  
 - 业务 VLAN 内普通流量：采集量与改前一致。  
-- 对端 VTEP 仍能稳定收到镜像流。
-
-**分片 map 落地后追加：**
-
-- 制造外层 IP 分片的自有 VXLAN：首片 + 后续片均不被再次 clone。  
+- 对端 VTEP 仍能稳定收到镜像流。  
+- 制造外层 IP 分片的自有 VXLAN：首片 + 后续片均不被再次 clone（依赖首片先到并写入 map）。  
 - 业务大 UDP 分片：后续片仍会被 clone。  
-- 满 LRU / ID 复用极端情况：偶发漏 skip 或极短误 skip，不导致业务采集长期失效。
 
 现场确认回灌仍用 hairpin 文档最小抓包集（underlay out 有、业务口 in 有、业务口 out 无）。
 
@@ -286,4 +280,4 @@ return skip
 ## 9. 一句话
 
 > **VLAN：剥一层 tag 再认 VXLAN 端口，几乎不误伤业务（已落地）。**  
-> **分片：不能一刀切 skip；首片认 dport 并（MF=1 时）写入 LRU 表，后续片按 `(saddr,daddr,proto,id)` 连坐；优先少分片，再上精确防环（设计已定，待编码）。**
+> **分片：不能一刀切 skip；首片认 dport 并（MF=1 时）写入 LRU 表，后续片按 `(saddr,daddr,proto,id)` 连坐；优先少分片（已落地）。**

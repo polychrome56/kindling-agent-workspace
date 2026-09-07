@@ -54,7 +54,7 @@ disable-model-invocation: false
 - 自有 VXLAN UDP dport 命中则 **不** `clone_redirect`（避免把外层自流量再镜像一遍）。  
 - **egress 与 ingress 都要 skip**；只做 egress 时，同桥 hairpin 回灌会在业务口 ingress 再采集 → 吞吐被 TBF 卡住的平台期。  
 - 解析：以太后可选 **单层** 802.1Q/AD，再认 IPv4+UDP+dport（`tf_parse_eth_l3`）。QinQ 仍可能漏过滤。  
-- IP 分片**非首片**：设计用 `self_frags` LRU map 连坐 skip（见长文；**待实现**）。禁止全局 skip 所有分片。  
+- IP 分片**非首片**：`self_frags` LRU map 连坐 skip（软 TTL 2s）。禁止全局 skip 所有分片。  
 - skip 只停「再镜像」；远端 VTEP 仍收正常 underlay 发出的 VXLAN。
 
 ## 排障顺序（一次只改一个变量）

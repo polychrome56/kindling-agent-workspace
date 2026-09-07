@@ -14,12 +14,14 @@ disable-model-invocation: false
 - `kindling/probe/`：probe 的用户态控制层，包含 CGO 相关边界，负责组织和驱动底层能力。
 - `kindling/probe/src/core/`：核心功能实现区，按模块承载具体能力实现。
 - `kindling/probe/src/core/traffic_forwarding/`：流量转发相关实现，重点关注模块职责、资源生命周期和模块间协作。
+- 流量转发路径、防环与排障骨架：见 skill `traffic-forwarding`（勿在本文件展开长文）。
 
 ## traffic_forwarding 模块边界
 
 - `virtual_device`：设备生命周期、基础 link 状态、设备统计入口。
 - `tc qdisc / rate limit`：建议后续拆出 `TcQdiscManager`。
 - `src/example`：当前承担需要 root、`iproute2`、`tc` 的集成验证。
+- 路径代际、自流量 skip、同桥 hairpin、`tx_errors`：交给 `traffic-forwarding` skill。
 
 ## 使用方式
 

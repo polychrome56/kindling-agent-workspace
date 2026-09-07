@@ -6,6 +6,6 @@
 |------|------|
 | [traffic-forwarding-path-evolution.md](./traffic-forwarding-path-evolution.md) | 拓扑代际演变总览 |
 | [ovs-bridge-hairpin-mirror-amplification.md](./ovs-bridge-hairpin-mirror-amplification.md) | 同桥回灌与 ingress 防环 |
-| [self-traffic-filter-vlan-and-fragments.md](./self-traffic-filter-vlan-and-fragments.md) | VLAN / 分片防环边界 |
+| [self-traffic-filter-vlan-and-fragments.md](./self-traffic-filter-vlan-and-fragments.md) | 自流量防环技术说明：VLAN（已落地）+ 分片 LRU map（设计已定） |
 
 更细的实现草案、压测笔记若只在本地 `agent-libs/docs/`，文中会标明「本地可选」；**本目录三篇为 workspace 真相源**。

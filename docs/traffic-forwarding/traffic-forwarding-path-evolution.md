@@ -375,7 +375,7 @@ underlay 发出：可能是完整 VXLAN，或「第一片 + 后续片」
 | VLAN | **已落地**：单层 802.1Q/AD 解析（`tf_parse_eth_l3`） |
 | 观测 | underlay 上区分「完整 UDP 4790」vs「Fragmented IP proto=UDP」占比，评估是否真成问题 |
 
-设计备忘：[`self-traffic-filter-vlan-and-fragments.md`](./self-traffic-filter-vlan-and-fragments.md)。
+设计备忘：[`self-traffic-filter-vlan-and-fragments.md`](./self-traffic-filter-vlan-and-fragments.md)（VLAN 已落地；分片 LRU map **设计已定、待实现**）。
 
 ### 6.5 一句话
 
@@ -392,7 +392,7 @@ underlay 发出：可能是完整 VXLAN，或「第一片 + 后续片」
 | ③ | 目标网卡→veth→vxlan | 自有设备削峰；保序；护 underlay | 同步 TBF 残余；缺 headroom→`tx_errors` | veth + TBF/FIFO；MTU 65535 |
 | ④ | 目标网卡→dummy→veth→vxlan | 异步 + 削峰兼得 | 实现复杂度；仍需处理 headroom/出口锁 | 独立边界 dummy + 其后 TBF |
 | +XDP | veth_b 空 XDP | VXLAN 扩头 ENOMEM | 强制 veth MTU 1500；多一次拷贝 | `XDP_PASS` 借驱动预留 |
-| 未来 | — | — | GSO 后仍可能 IP 分片；非首片无法按 dport 防环 | 见 §6 |
+| 未来 | — | — | GSO 后仍可能 IP 分片；非首片需 self_frags map（设计已定） | 见 §6 / 防环长文 |
 
 ---
 
@@ -402,7 +402,7 @@ underlay 发出：可能是完整 VXLAN，或「第一片 + 后续片」
 
 1. 本文：拓扑演变总览  
 2. [`ovs-bridge-hairpin-mirror-amplification.md`](./ovs-bridge-hairpin-mirror-amplification.md) — 同桥回灌与 ingress 防环  
-3. [`self-traffic-filter-vlan-and-fragments.md`](./self-traffic-filter-vlan-and-fragments.md) — VLAN / 分片防环边界  
+3. [`self-traffic-filter-vlan-and-fragments.md`](./self-traffic-filter-vlan-and-fragments.md) — 自流量防环：VLAN + 分片 map 技术说明  
 
 ### 本地可选（常见于 `agent-libs/docs/`，不在本仓）
 

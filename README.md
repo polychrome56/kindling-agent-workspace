@@ -57,6 +57,8 @@ kindling-agent-workspace/
 │  │  │  └─ SKILL.md                          # kindling / agent-libs 项目结构地图
 │  │  ├─ modern-cpp/
 │  │  │  └─ SKILL.md                          # C/C++ 工程实践辅助
+│  │  ├─ traffic-forwarding/
+│  │  │  └─ SKILL.md                          # 流量转发路径 / 防环 / 排障骨架
 │  │  └─ publish-workspace/
 │  │     └─ SKILL.md                          # workspace-git-publisher 专用发布流程
 │  └─ rules/
@@ -68,6 +70,8 @@ kindling-agent-workspace/
 │     └─ kindling/
 │        ├─ collaboration-principles.mdc      # kindling 协作规则
 │        └─ cpp-engineering.mdc               # kindling C/C++ 工程规则
+├─ docs/
+│  └─ traffic-forwarding/                     # 流量转发协作文档（可提交）
 ├─ agent-libs/                                # 本地源码目录，git 不跟踪
 └─ kindling/                                  # 本地源码目录，git 不跟踪
 ```
@@ -86,6 +90,7 @@ kindling-agent-workspace/
 | `.cursor/agents/*.md` | Cursor 项目级 sub-agent 定义。 |
 | `.cursor/commands/*.md` | 面向用户的 Cursor command 入口。 |
 | `.cursor/hooks/*` | 操作前后的安全检查或自动化脚本。 |
+| `docs/traffic-forwarding/` | 流量转发协作长文（可提交）；配合 `traffic-forwarding` skill。 |
 
 子项目专属规则不要设置 `alwaysApply: true`，必须靠 `globs` 约束到对应目录。不要在 `agent-libs/` 或 `kindling/` 子项目里再建 `.cursor/rules/`；规则统一放在 workspace 根的 `.cursor/rules/`。
 

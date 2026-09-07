@@ -63,13 +63,13 @@ disable-model-invocation: false
 3. **业务 UDP 丢 / TCP 重传升、整机 CPU 不高**：优先看目标网卡 CPU 上同步 clone 成本（历史第①代问题；第③代仍可能把成本挪到业务路径附近）。  
 4. 观测优先于调参：`ip -s link`、`tc -s qdisc`、必要时 kprobe/`bpftrace`；不要一次改 GSO+MTU+TBF。
 
-## 长文入口（本地有 agent-libs 拷贝时）
+## 长文入口（本仓可提交）
 
-- `agent-libs/docs/traffic-forwarding-path-evolution.md` — 拓扑演变总览  
-- `agent-libs/docs/ovs-bridge-hairpin-mirror-amplification.md` — 同桥回灌与 ingress skip  
-- `agent-libs/docs/self-traffic-filter-vlan-and-fragments.md` — VLAN / 分片防环边界  
+- [`docs/traffic-forwarding/traffic-forwarding-path-evolution.md`](../../../docs/traffic-forwarding/traffic-forwarding-path-evolution.md) — 拓扑演变总览  
+- [`docs/traffic-forwarding/ovs-bridge-hairpin-mirror-amplification.md`](../../../docs/traffic-forwarding/ovs-bridge-hairpin-mirror-amplification.md) — 同桥回灌与 ingress skip  
+- [`docs/traffic-forwarding/self-traffic-filter-vlan-and-fragments.md`](../../../docs/traffic-forwarding/self-traffic-filter-vlan-and-fragments.md) — VLAN / 分片防环边界  
 
-本仓库不提交 `agent-libs/` 业务树；上述路径是阅读引用，不是本仓文件。
+目录索引见 [`docs/traffic-forwarding/README.md`](../../../docs/traffic-forwarding/README.md)。更细的压测/草案若只在本地 `agent-libs/docs/`，以文中「本地可选」标注为准。
 
 ## 输出要求
 

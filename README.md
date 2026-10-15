@@ -51,6 +51,8 @@ kindling-agent-workspace/
 │  ├─ hooks/
 │  │  └─ protect-workspace-publish.sh         # git / gh 操作前的安全检查
 │  ├─ skills/
+│  │  ├─ concrete-technical-explanation/
+│  │  │  └─ SKILL.md                          # 用实例和因果链解释复杂问题
 │  │  ├─ git-commit-message/
 │  │  │  └─ SKILL.md                          # Conventional Commits + 中文提交说明
 │  │  ├─ kindling-project-map/

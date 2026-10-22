@@ -2,6 +2,20 @@
 /agent-libs/
 /kindling/
 
+# 本地版本源码、现场文档和 profile，不属于协作配置资产。
+/4.1.0/
+/ahyd/
+/安徽移动/
+
+# Codex / 语言服务的本机依赖、编译参数与索引缓存。
+/.local/
+/.cache/
+/compile_commands.json
+/.serena/*
+!/.serena/project.yml
+**/__pycache__/
+*.pyc
+
 # 本地发布配置。个人账号和仓库信息放这里，不提交。
 config/git-publish.env
 

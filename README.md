@@ -1,6 +1,6 @@
 # kindling-agent-workspace
 
-这是一个给 **Cursor / Claude Code（CC）** 使用的 Agent 协作配置资产仓库，用来沉淀可复用的 rule、skill、sub-agent、command 和 hook。
+这是一个给 **Cursor / Codex / Claude Code（CC）** 使用的 Agent 协作配置资产仓库，用来沉淀可复用的 rule、skill、sub-agent、command 和 hook。
 
 本仓库不是业务源码仓库。`agent-libs/`、`kindling/` 这类目录可以作为本地工作区源码存在，但它们属于用户自行放入的业务代码，默认被 `.gitignore` 排除，不应提交到本仓库。
 
@@ -15,18 +15,19 @@
 3. **更安全**
    通过 rule 与 hook 显式限制模型的工具调用范围、危险操作（批量 `rm`、`git push --force`、改 `~/.ssh` 等），把"该不该做"的判断从 prompt 里前置到配置里。
 
-4. **Cursor / CC 双栈复用**
-   两种工具的配置可以并存于同一目录，便于团队在两者之间切换或同时使用，也方便把一份协作约定迁移到不同 Agent 工具。
+4. **多工具复用**
+   Cursor 与 Codex 的配置独立并存，便于团队切换；Claude Code 资产仍按需要添加。
 
 ## 设计原则：仓库只保留规则与新特性，不带业务代码
 
 > 工作区下可以存在 `agent-libs/`、`kindling/` 这类子项目源码目录，但它们属于
 > **用户自行拷贝进来的业务代码**，不属于本 git 仓库的内容。
 
-只保留 Cursor / CC 用得到的"协作配置类"内容，典型包括：
+只保留各工具用得到的"协作配置类"内容，典型包括：
 
 - **Cursor 侧**：`.cursor/rules/`、`.cursor/agents/`、`.cursor/commands/`、`.cursor/hooks/`、`.cursor/skills/` 等。
-- **Claude Code 侧**：`CLAUDE.md`、`AGENTS.md`、`.claude/agents/`、`.claude/commands/`、`.claude/hooks/` 等需要时再添加。
+- **Codex 侧**：`AGENTS.md`、`.agents/skills/`、`.agents/references/`、`.codex/config.toml`；代码索引使用 `.serena/project.yml` 和 `scripts/codex/`。
+- **Claude Code 侧**：`CLAUDE.md`、`.claude/agents/`、`.claude/commands/`、`.claude/hooks/` 等需要时再添加。
 
 这样做的好处：
 
@@ -39,7 +40,12 @@
 ```text
 kindling-agent-workspace/
 ├─ README.md
+├─ AGENTS.md                                  # Codex 工作区约定
 ├─ .gitignore
+├─ .agents/                                   # Codex 技能与按需加载的工程约定
+├─ .codex/config.toml                          # 项目级 Serena MCP
+├─ .serena/project.yml                         # 可共享的索引配置
+├─ scripts/codex/                              # 本地安装、启动、编译数据库与发布检查
 ├─ config/
 │  └─ git-publish.env.example                 # 本地发布配置模板
 ├─ .cursor/
@@ -102,11 +108,32 @@ kindling-agent-workspace/
 2. 在 Cursor / CC 中以 `kindling-agent-workspace` 为根打开，Cursor 会按 `.cursor/rules/` 中的 `alwaysApply` 和 `globs` 加载规则。
 3. 修改 README、rule、skill、sub-agent、hook 提示文案时，默认优先使用中文；命令、配置键、环境变量和工具字段保持原样。
 4. 新增通用规则放 `.cursor/rules/` 根级；新增子项目规则放对应子目录并配置 `globs`；新增 sub-agent 专用规则放 `.cursor/rules/agent-rules/` 并由 sub-agent 显式 `@` 引用。
-5. 如需兼容 Claude Code，可按需要新增 `CLAUDE.md`、`AGENTS.md` 或 `.claude/` 资产；当前仓库主要资产集中在 Cursor 目录。
+5. 使用 Codex 时，以本仓库为根打开；`AGENTS.md` 与 `.agents/skills/` 是原生项目资产。首次代码索引安装见下一节。
+6. 如需兼容 Claude Code，可按需要新增 `CLAUDE.md` 或 `.claude/` 资产。
+
+## Codex：技能与代码索引
+
+Cursor 的六个任务技能已适配到 `.agents/skills/`，另增加 `code-navigation`：
+
+- 技能是工作方法：例如 `$kindling-project-map`、`$modern-cpp`、`$git-commit-message`。
+- MCP 是实际工具连接：本项目配置 Serena，通过 clangd/gopls 查询代码定义与引用。
+- 克隆仓库后技能可以被 Codex 发现；语言服务依赖和本机索引需要在本机安装、生成，不提交进 Git。
+
+在仓库根执行：
+
+```bash
+bash scripts/codex/setup.sh --build-dir /path/to/kindling/probe/build
+```
+
+需要 `uv`、Python3、Go >=1.23；可用 `CODEX_GO_BINARY` 指定 Go。已有构建目录仅用于导出编译参数，这个脚本不编译业务程序。首次使用时信任本项目配置，然后重启 Codex，在 `/mcp` 中检查 `serena` 是否连接。
+
+安装步骤、BPF/Lua 覆盖限制、技能迁移说明及发布方式见 [Codex 使用说明](docs/codex/README.md)。
 
 ## 发布到 GitHub
 
 发布本 workspace 时，优先使用 `.cursor/commands/publish-workspace.md` 或直接调用 `.cursor/agents/workspace-git-publisher.md` 中的 `workspace-git-publisher` sub-agent。
+
+Codex 使用 `$publish-workspace`，并运行 `python3 scripts/codex/check_workspace_publish.py` 检查暂存范围。Cursor 的 hook 仍只作用于 Cursor，未被当作 Codex hook 自动安装。
 
 发布链路包括：
 
@@ -142,4 +169,4 @@ GH_TOKEN=your-temporary-token
 - 不在本仓库提交业务代码、构建产物、二进制或 IDE 缓存。
 - 不把本地个人配置、GitHub token、私钥或临时凭据提交进来。
 - 不让子项目专属规则全局生效。
-- 不把 Cursor / CC 的私有约定混进同一个文件；需要双栈复用时，按各自目录约定分别维护。
+- 不把 Cursor / Codex / CC 的私有格式混进同一个文件；按各自目录约定分别维护。

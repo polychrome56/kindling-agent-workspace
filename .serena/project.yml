@@ -1,0 +1,48 @@
+# 团队共享配置；本机路径由忽略的 project.local.yml 覆盖。
+# 保留 Serena 2.1.0 的默认键，避免启动时自动补写共享文件。
+project_name: kindling-agent-workspace
+language_servers:
+- cpp
+- go
+encoding: utf-8
+language_backend: LSP
+agent_interface: tools
+ignore_all_files_in_gitignore: false
+ls_workspace_folders:
+- .
+ignored_paths:
+- '**/.git/**'
+- .local/**
+- .cache/**
+- .cursor/**
+- .agents/**
+- .serena/**
+- '**/vendor/**'
+- '**/node_modules/**'
+- '**/cmake-build*/**'
+- '**/_deps/**'
+- '**/build/**'
+- '**/*.o'
+- '**/*.a'
+- '**/*.so'
+read_only: true
+initial_prompt: '从工作区根 AGENTS.md 读取约定。先确认当前业务版本及编译数据库覆盖范围。
+
+  不要把零引用、缺失编译配置或未启用的宏分支解释成代码无用。
+
+  '
+default_modes: null
+added_modes: null
+included_apis: []
+excluded_apis: []
+excluded_tools: []
+included_optional_tools: []
+fixed_tools: []
+symbol_info_budget: null
+line_ending: null
+read_only_memory_patterns: []
+ignored_memory_patterns: []
+ls_specific_settings: {}
+ls_additional_workspace_folders: []
+activation_command: null
+activation_command_timeout: 180.0

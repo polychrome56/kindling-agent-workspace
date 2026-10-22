@@ -1,0 +1,7 @@
+# 从本仓库根目录启动 Codex；首次使用先运行 bash scripts/codex/setup.sh。
+# 仅配置项目工具，不覆盖个人模型、认证、权限或全局 MCP 配置。
+[mcp_servers.serena]
+command = "bash"
+args = ["scripts/codex/serena.sh", "start-mcp-server", "--context", "codex", "--project", ".", "--open-web-dashboard", "false"]
+startup_timeout_sec = 120
+tool_timeout_sec = 120
